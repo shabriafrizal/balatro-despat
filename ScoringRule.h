@@ -1,6 +1,9 @@
 #pragma once
+
+#include "Hand.h"
+
 class ScoringRule
 {
 public:
-    int scoreHand();
+    int scoreHand(const Hand &hand);
 };
