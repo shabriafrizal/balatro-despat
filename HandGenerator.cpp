@@ -118,18 +118,13 @@ Hand HandGenerator::generateHand(size_t cardCount)
         hand.addCard(deck[i]);
     }
 
-    std::cout << "Hand: ";
+    std::cout << "Hand:\n";
     const std::vector<Card> &cards = hand.getCards();
     for (size_t i = 0; i < cards.size(); ++i)
     {
         const Card &card = cards[i];
-        std::cout << rankToString(card.rank) << " of " << suitToString(card.suit);
-        if (i + 1 < cards.size())
-        {
-            std::cout << ", ";
-        }
+        std::cout << "[" << i << "] " << rankToString(card.rank) << " of " << suitToString(card.suit) << "\n";
     }
-    std::cout << "\n";
 
     return hand;
 }
