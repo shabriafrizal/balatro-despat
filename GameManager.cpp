@@ -20,7 +20,7 @@ void GameManager::runSession()
     setupJokers();
 
     // Generate initial hand with 5 cards
-    Hand generatedHand = handGenerator.generateHand(5);
+    Hand generatedHand = handGenerator.generateHand(8);
     std::cout << "[Debug] Generated hand with " << generatedHand.getCardCount() << " cards\n";
 
     // Get user input to choose cards
