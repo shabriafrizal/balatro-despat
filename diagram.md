@@ -3,31 +3,49 @@ flowchart TD
 	main["main()"] --> runSession["GameManager::runSession()"]
 
 	subgraph SessionSetup["Session Setup"]
-		setupJokers["setupJokers()"]
-		generateHand["HandGenerator::generateHand(8)"]
-		chooseHand["ChooseHand::chooseFromHandWithUserInput()"]
+		setupJokers["setupJokers()\nadds FlatChipJoker + PairJoker"]
+		buildDeck["buildAndShuffleDeck()\n52 cards"]
+		drawInitial["drawToHand(8)"]
 	end
 
-	runSession --> setupJokers --> generateHand --> chooseHand
+	runSession --> setupJokers --> buildDeck --> drawInitial
 
-	subgraph Scoring["Scoring"]
-		calcBase["ScoringRule::calculateBaseScore()"]
-		evalRank["evaluate hand rank (checker chain)"]
-		baseTable["HandScoreTable::getScore()"]
-		sumCardChips["sum card rank chips (A=11, face=10, number=number)"]
-		buildContext["build ScoreContext + recomputeFinalScore()"]
-		applyJokers["JokerManager::applyJokers()"]
-		recomputeFinal["recomputeFinalScore()"]
+	subgraph PlayDiscardLoop["Play / Discard Loop"]
+		displayHand["displayCurrentHand()"]
+		status["show handsRemaining / discardsRemaining"]
+		choice{"[P]lay or [D]iscard?"}
+		handlePlay["handlePlay()"]
+		handleDiscard["handleDiscard()"]
+		promptPlay["promptCardSelection()"]
+		promptDiscard["promptCardSelection()"]
+		choosePlay["chooseHand.chooseFromHand()"]
+		chooseDiscard["chooseHand.discardFromHand()"]
+		removeCards["removeCardsFromHand()"]
+		scoreResolve["resolvePlayedHand()"]
+		decWin{"runWon?"}
+		decHandsRemaining{"handsRemaining == 0?"}
+		endWin["Run Ended (Win)"]
+		endLose["Run Ended (Lose)"]
+		decDiscards{"discardsRemaining > 0?"}
+		discardDraw["drawToHand(8)\n(draw back up)"]
+		playDraw["drawToHand(8)\n(draw back up)"]
+		decHands{"handsRemaining > 0?"}
 	end
 
-	chooseHand --> calcBase
-	calcBase --> evalRank --> baseTable --> sumCardChips --> buildContext --> applyJokers --> recomputeFinal
+	drawInitial --> displayHand --> status --> choice
+	choice -- "Play / P" --> handlePlay
+	choice -- "Discard / D" --> handleDiscard
 
-	subgraph Results["Results"]
-		printResult["print hand type/chips/mult/final"]
-		checkBlind["BlindRule::checkBlind()"]
-		reward["RewardRule::earnMoney()"]
-	end
+	%% Play path
+	handlePlay --> promptPlay --> choosePlay --> removeCards --> scoreResolve --> decWin
+	decWin -- "Yes" --> endWin
+	decWin -- "No" --> decHands["handsRemaining--"] --> decHandsRemaining
+	decHandsRemaining -- "Yes" --> endLose
+	decHandsRemaining -- "No" --> playDraw --> decHands
+	decHands -- "Yes" --> displayHand
 
-	recomputeFinal --> printResult --> checkBlind --> reward
+	%% Discard path
+	handleDiscard --> decDiscards
+	decDiscards -- "No" --> displayHand
+	decDiscards -- "Yes" --> promptDiscard --> chooseDiscard --> decDisc["discardsRemaining--"] --> discardDraw --> displayHand
 ```
