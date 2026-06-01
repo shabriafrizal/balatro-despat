@@ -1,22 +1,45 @@
 ```mermaid
 flowchart TD
-	main["main.cpp"] --> GameManager
+	main["main()"] --> runSession["GameManager::runSession()"]
+	runSession --> runService["RunSessionService::runSession()"]
 
-	GameManager --> HandGenerator
-	GameManager --> ChooseHand
-	GameManager --> ScoringRule
-	GameManager --> BlindRule
-	GameManager --> RewardRule
-	GameManager --> HandPlayer
+	subgraph SessionSetup["Session Setup"]
+		setupJokers["setupJokers()"]
+		createDeck["createShuffledDeck()"]
+		drawInitial["drawInitialHand()"]
+	end
 
-	HandGenerator --> Hand
-	ChooseHand --> Hand
-	ScoringRule --> Hand
+	runService --> setupJokers --> createDeck --> drawInitial
 
-	ScoringRule --> Checkers
-	Checkers --> PokerHandChecker
-	PokerHandChecker --> Hand
-	PokerHandChecker --> HandRank
+	subgraph MainLoop["Main Gameplay Loop"]
+		loopStart["runSessionLoop()"]
+		printState["printCurrentState()"]
+		readAction["readPlayerActionRequest()"]
+		validateAction["canPerformAction()"]
+		processAction["processPlayerAction()"]
+	end
 
-	Hand --> Card
+	drawInitial --> loopStart
+	loopStart --> printState --> readAction --> validateAction --> processAction
+
+	subgraph PlayBranch["PLAY Branch"]
+		resolveHand["resolveHand()"]
+		baseScore["calculateBaseScore()"]
+		applyJokers["applyJokers()"]
+		printResult["printResult()"]
+		reducePlays["reduceRemainingPlays()"]
+	end
+
+	subgraph DiscardBranch["DISCARD Branch"]
+		discardCards["discardSelectedCards()"]
+		drawNew["drawNewCards()"]
+		updateHand["updateHand()"]
+		reduceDiscards["reduceRemainingDiscards()"]
+	end
+
+	processAction --> resolveHand
+	processAction --> discardCards
+
+	resolveHand --> baseScore --> applyJokers --> printResult --> reducePlays --> loopStart
+	discardCards --> drawNew --> updateHand --> reduceDiscards --> loopStart
 ```
