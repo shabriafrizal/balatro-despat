@@ -16,6 +16,30 @@
 #include "Checkers/PairChecker.h"
 #include "Checkers/HighCardChecker.h"
 
+namespace
+{
+    int cardRankToChips(Card::Rank rank)
+    {
+        int rawRank = static_cast<int>(rank);
+        if (rawRank >= static_cast<int>(Card::Rank::TWO) && rawRank <= static_cast<int>(Card::Rank::TEN))
+        {
+            return rawRank;
+        }
+
+        switch (rank)
+        {
+        case Card::Rank::JACK:
+        case Card::Rank::QUEEN:
+        case Card::Rank::KING:
+            return 10;
+        case Card::Rank::ACE:
+            return 11;
+        default:
+            return 0;
+        }
+    }
+}
+
 BaseScore ScoringRule::calculateBaseScore(const Hand &hand) const
 {
     std::cout << "Calculating hand score...\n";
@@ -51,9 +75,15 @@ BaseScore ScoringRule::calculateBaseScore(const Hand &hand) const
     HandScoreTable scoreTable;
     HandScoreEntry entry = scoreTable.getScore(rank);
 
+    int cardChips = 0;
+    for (const Card &card : hand.getCards())
+    {
+        cardChips += cardRankToChips(card.rank);
+    }
+
     BaseScore result;
     result.handType = rank;
-    result.chips = entry.chips;
+    result.chips = entry.chips + cardChips;
     result.multiplier = entry.multiplier;
     return result;
 }

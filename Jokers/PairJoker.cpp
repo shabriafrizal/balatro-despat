@@ -17,4 +17,8 @@ std::string PairJoker::getDescription(const ScoreContext &context) const
 
 void PairJoker::onScoreCalculated(ScoreContext &context)
 {
+    if (context.handType == HandRank::PAIR)
+    {
+        context.multiplier += 4;
+    }
 }
