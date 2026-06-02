@@ -1,6 +1,6 @@
 #pragma once
 
-#include "IBlindState.h"
+#include "../Blind/IBlindState.h"
 
 /**
  * Ante Progression state in the blind progression cycle.

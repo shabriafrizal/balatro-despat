@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "ScoreContext.h"
+#include "../Scoring/ScoreContext.h"
 
 class Joker
 {

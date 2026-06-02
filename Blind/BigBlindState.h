@@ -13,12 +13,17 @@
 class BigBlindState : public IBlindState
 {
 public:
+    explicit BigBlindState(int anteLevel);
+
     int getRequiredScore() const override;
     int getReward() const override;
     const char *getName() const override;
+    bool canSkip() const override;
     void transitionToNextState(BlindManager &manager, bool blindWon) override;
 
 private:
-    static constexpr int REQUIRED_SCORE = 200;
+    int ante;
+
+    static constexpr int BASE_SCORE = 450;
     static constexpr int REWARD = 50;
 };

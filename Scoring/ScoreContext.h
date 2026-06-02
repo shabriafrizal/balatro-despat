@@ -1,7 +1,7 @@
 #pragma once
 
-#include "Hand.h"
-#include "HandRank.h"
+#include "../Hand/Hand.h"
+#include "../Hand/HandRank.h"
 
 struct ScoreContext
 {

@@ -2,7 +2,7 @@
 
 #include <memory>
 
-class IBlindState;
+#include "IBlindState.h"
 
 /**
  * Manages blind progression state and transitions.
@@ -57,11 +57,26 @@ public:
 
     /**
      * Get the current ante level.
-     * Used by AnteProgressionState to scale requirements.
+     * Used by blind states to scale requirements.
      *
      * @return Current ante value
      */
     int getAnteLevel() const;
+
+    /**
+     * Whether the current blind can be skipped by the player.
+     * Boss Blinds cannot be skipped.
+     *
+     * @return true if the current blind allows skipping
+     */
+    bool canSkipCurrentBlind() const;
+
+    /**
+     * Skip the current blind, advancing to the next state
+     * as if the blind was won (but with no reward).
+     * Has no effect if the current blind cannot be skipped.
+     */
+    void skipBlind();
 
     /**
      * Advance blind progression to the next state.
@@ -81,8 +96,8 @@ public:
 
     /**
      * Increment ante counter.
-     * Called after passing AnteProgressionState.
-     * This increases difficulty for subsequent ante progression states.
+     * Called after passing BossBlindState.
+     * This increases difficulty for the next cycle of blinds.
      */
     void incrementAnte();
 
