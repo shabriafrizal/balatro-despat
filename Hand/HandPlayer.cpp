@@ -5,11 +5,9 @@
 #include "HandPlayer.h"
 #include "Hand.h"
 #include "ChooseHand.h"
-#include "ScoringRule.h"
-#include "BlindRule.h"
-#include "RewardRule.h"
-#include "JokerManager.h"
-#include "ScoreContext.h"
+#include "Scoring/ScoringRule.h"
+#include "Joker/JokerManager.h"
+#include "Scoring/ScoreContext.h"
 #include "HandRankUtils.h"
 
 namespace
@@ -36,13 +34,11 @@ namespace
     }
 }
 
-bool HandPlayer::handlePlay(
+int HandPlayer::handlePlay(
     Hand &currentHand,
     std::vector<Card> &deck,
     ChooseHand &chooseHand,
     ScoringRule &scoringRule,
-    BlindRule &blindRule,
-    RewardRule &rewardRule,
     JokerManager &jokerManager,
     int &handsRemaining)
 {
@@ -53,13 +49,13 @@ bool HandPlayer::handlePlay(
     if (indices.empty())
     {
         std::cerr << "No valid cards selected!\n";
-        return false;
+        return -1;
     }
 
     if (indices.size() > 5)
     {
         std::cout << "You can only play up to 5 cards!\n";
-        return false;
+        return -1;
     }
 
     Hand playedHand =
@@ -68,14 +64,8 @@ bool HandPlayer::handlePlay(
 
     removeCardsFromHand(currentHand, indices);
 
-    bool runWon = resolvePlayedHand(
-        playedHand, scoringRule, blindRule,
-        rewardRule, jokerManager);
-
-    if (runWon)
-    {
-        return true;
-    }
+    int score = resolvePlayedHand(
+        playedHand, scoringRule, jokerManager);
 
     handsRemaining--;
 
@@ -84,7 +74,7 @@ bool HandPlayer::handlePlay(
         drawToHand(currentHand, deck, 8);
     }
 
-    return false;
+    return score;
 }
 
 void HandPlayer::handleDiscard(
@@ -155,11 +145,9 @@ void HandPlayer::removeCardsFromHand(
     }
 }
 
-bool HandPlayer::resolvePlayedHand(
+int HandPlayer::resolvePlayedHand(
     const Hand &playedHand,
     ScoringRule &scoringRule,
-    BlindRule &blindRule,
-    RewardRule &rewardRule,
     JokerManager &jokerManager)
 {
     BaseScore baseScore =
@@ -192,29 +180,7 @@ bool HandPlayer::resolvePlayedHand(
         << scoreContext.finalScore
         << "\n";
 
-    bool win =
-        blindRule.checkBlind(
-            scoreContext.finalScore);
-
-    int reward =
-        rewardRule.earnMoney(
-            win,
-            scoreContext.finalScore);
-
-    std::cout
-        << "[Debug] Money gained: "
-        << reward
-        << "\n";
-
-    if (win)
-    {
-        std::cout
-            << "=== Run Ended (Win) ===\n";
-
-        return true;
-    }
-
-    return false;
+    return scoreContext.finalScore;
 }
 
 void HandPlayer::drawToHand(

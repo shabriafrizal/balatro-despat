@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../Joker.h"
+#include "Joker.h"
 
 class FlatChipJoker : public Joker
 {

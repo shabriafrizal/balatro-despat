@@ -1,0 +1,27 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Build",
+			"type": "shell",
+			"command": "g++",
+			"args": [
+				"-std=c++17",
+				"-O2",
+				"-Wall",
+				"-Wextra",
+				"-pedantic",
+				"-I.",
+				"*.cpp",
+				"Core\\*.cpp",
+				"Hand\\*.cpp",
+				"Blind\\*.cpp",
+				"Joker\\*.cpp",
+				"Scoring\\*.cpp",
+				"Ante\\*.cpp",
+				"-o",
+				"balatro.exe"
+			]
+		}
+	]
+}

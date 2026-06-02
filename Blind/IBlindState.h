@@ -41,6 +41,14 @@ public:
     virtual const char *getName() const = 0;
 
     /**
+     * Whether this blind can be skipped by the player.
+     * Boss Blinds cannot be skipped — they must be played.
+     *
+     * @return true if the player may skip this blind
+     */
+    virtual bool canSkip() const = 0;
+
+    /**
      * Determine and transition to the next blind state.
      *
      * This method encapsulates progression logic:

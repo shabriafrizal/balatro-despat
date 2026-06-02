@@ -2,13 +2,14 @@
 
 #include <vector>
 
-#include "HandGenerator.h"
-#include "HandPlayer.h"
-#include "ScoringRule.h"
-#include "BlindRule.h"
-#include "RewardRule.h"
-#include "ChooseHand.h"
-#include "JokerManager.h"
+#include "Hand/HandGenerator.h"
+#include "Hand/HandPlayer.h"
+#include "Scoring/ScoringRule.h"
+#include "Blind/BlindRule.h"
+#include "Scoring/RewardRule.h"
+#include "Hand/ChooseHand.h"
+#include "Joker/JokerManager.h"
+#include "Blind/BlindManager.h"
 
 class GameManager
 {
@@ -21,6 +22,15 @@ private:
     void drawToHand(size_t targetCount);
     void displayCurrentHand() const;
 
+    /** Start a new blind: show info, reset hands/discards and accumulated score */
+    void startBlind();
+
+    /** Try to play a hand; returns true if the blind was cleared */
+    bool tryPlayHand();
+
+    /** Try to discard cards */
+    void tryDiscard();
+
 private:
     HandGenerator handGenerator;
     HandPlayer handPlayer;
@@ -29,6 +39,7 @@ private:
     RewardRule rewardRule;
     ChooseHand chooseHand;
     JokerManager jokerManager;
+    BlindManager blindManager;
 
     Hand currentHand;
     std::vector<Card> deck;

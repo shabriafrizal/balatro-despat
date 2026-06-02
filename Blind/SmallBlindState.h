@@ -13,12 +13,17 @@
 class SmallBlindState : public IBlindState
 {
 public:
+    explicit SmallBlindState(int anteLevel);
+
     int getRequiredScore() const override;
     int getReward() const override;
     const char *getName() const override;
+    bool canSkip() const override;
     void transitionToNextState(BlindManager &manager, bool blindWon) override;
 
 private:
-    static constexpr int REQUIRED_SCORE = 100;
+    int ante;
+
+    static constexpr int BASE_SCORE = 300;
     static constexpr int REWARD = 25;
 };

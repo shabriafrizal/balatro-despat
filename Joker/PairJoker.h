@@ -1,7 +1,7 @@
 #pragma once
 
-#include "../Joker.h"
-#include "../HandRank.h"
+#include "Joker.h"
+#include "../Hand/HandRank.h"
 
 class PairJoker : public Joker
 {

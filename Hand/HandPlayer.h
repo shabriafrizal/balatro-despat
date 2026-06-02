@@ -15,11 +15,10 @@ struct Card;
 class HandPlayer
 {
 public:
-    // Returns true if the run was won
-    bool handlePlay(Hand &currentHand, std::vector<Card> &deck,
-                    ChooseHand &chooseHand, ScoringRule &scoringRule,
-                    BlindRule &blindRule, RewardRule &rewardRule,
-                    JokerManager &jokerManager, int &handsRemaining);
+    // Returns the score of the played hand, or -1 if no play occurred
+    int handlePlay(Hand &currentHand, std::vector<Card> &deck,
+                   ChooseHand &chooseHand, ScoringRule &scoringRule,
+                   JokerManager &jokerManager, int &handsRemaining);
 
     void handleDiscard(Hand &currentHand, std::vector<Card> &deck,
                        ChooseHand &chooseHand, int &discardsRemaining);
@@ -33,11 +32,9 @@ private:
         Hand &currentHand,
         std::vector<size_t> indices) const;
 
-    bool resolvePlayedHand(
+    int resolvePlayedHand(
         const Hand &playedHand,
         ScoringRule &scoringRule,
-        BlindRule &blindRule,
-        RewardRule &rewardRule,
         JokerManager &jokerManager);
 
     void drawToHand(
