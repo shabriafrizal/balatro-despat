@@ -2,6 +2,9 @@
 #include "BigBlindState.h"
 #include "BlindManager.h"
 
+#include "SkipReward/RewardCommandQueue.h"
+#include "SkipReward/BonusMoneyCommand.h"
+
 SmallBlindState::SmallBlindState(int anteLevel)
     : ante(anteLevel)
 {
@@ -35,4 +38,11 @@ void SmallBlindState::transitionToNextState(BlindManager &manager, bool blindWon
             std::make_unique<BigBlindState>(manager.getAnteLevel()));
     }
     // If not won, the run is over — handled by GameManager
+}
+
+void SmallBlindState::queueSkipRewards(SkipReward::RewardCommandQueue &queue)
+{
+    // Small Blind skip: +$10
+    queue.enqueue(SkipReward::CommandTiming::Immediate,
+                  std::make_unique<SkipReward::BonusMoneyCommand>(10));
 }

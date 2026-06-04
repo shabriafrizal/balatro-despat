@@ -10,6 +10,9 @@
 #include "Joker/PairJoker.h"
 #include "Joker/MultiplierJoker.h"
 
+#include "SkipReward/RunSessionState.h"
+#include "SkipReward/CommandTiming.h"
+
 namespace
 {
     const std::array<Card::Suit, 4> kSuits = {
@@ -121,6 +124,9 @@ void GameManager::displayCurrentHand() const
 
 void GameManager::startBlind()
 {
+    // Execute any queued NextBlind rewards
+    executePendingCommands(SkipReward::CommandTiming::NextBlind);
+
     blindRule.reset();
     blindRule.setRequiredScore(blindManager.getRequiredScore());
     handsRemaining = 4;
@@ -167,6 +173,17 @@ void GameManager::tryDiscard()
         discardsRemaining);
 }
 
+void GameManager::executePendingCommands(SkipReward::CommandTiming timing)
+{
+    SkipReward::RunSessionState state{
+        handsRemaining,
+        discardsRemaining,
+        money,
+        freeRerolls};
+
+    commandQueue.executeCommandsWithTiming(timing, state);
+}
+
 void GameManager::runSession()
 {
     std::cout << "=== Run Started ===\n";
@@ -192,13 +209,29 @@ void GameManager::runSession()
 
             if (skipChoice == "S" || skipChoice == "s")
             {
+                // Enqueue skip rewards from the current blind state
+                blindManager.queueSkipRewards(commandQueue);
+
+                // Execute Immediate commands right away
+                executePendingCommands(SkipReward::CommandTiming::Immediate);
+
+                // Show what was gained
                 std::cout << "\nSkipping " << blindManager.getCurrentBlindName()
-                          << " — but gaining skip rewards!\n";
-                std::cout << "+1 Hand | +1 Discard | +10 Money\n";
-                handsRemaining += 1;
-                discardsRemaining += 1;
-                money += 10;
+                          << " — gaining skip rewards!\n";
+                {
+                    const auto &pending = commandQueue.getPendingCommands();
+                    for (const auto &cmd : pending)
+                    {
+                        if (cmd.executed)
+                            std::cout << "  + " << cmd.command->getDescription() << "\n";
+                    }
+                }
+
                 blindManager.skipBlind();
+
+                // Execute NextBlind commands at the start of the next blind
+                executePendingCommands(SkipReward::CommandTiming::NextBlind);
+
                 startBlind();
                 continue; // re-evaluate skip prompt for the next blind
             }
@@ -279,6 +312,12 @@ void GameManager::runSession()
                     std::cout << "+$" << reward << " reward earned!\n";
 
                     blindManager.advanceBlind(true);
+
+                    // Execute any queued NextAnte rewards after ante may have incremented
+                    executePendingCommands(SkipReward::CommandTiming::NextAnte);
+
+                    // Execute any queued NextShop rewards before entering shop
+                    executePendingCommands(SkipReward::CommandTiming::NextShop);
 
                     // Display shop after defeating a blind
                     shop.displayAndHandle(jokerManager, money);

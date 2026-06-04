@@ -27,7 +27,9 @@ public:
     int getRequiredScore() const override;
     int getReward() const override;
     const char *getName() const override;
+    bool canSkip() const override;
     void transitionToNextState(BlindManager &manager, bool blindWon) override;
+    void queueSkipRewards(SkipReward::RewardCommandQueue &queue) override;
 
 private:
     int ante;

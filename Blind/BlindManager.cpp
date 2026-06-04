@@ -4,6 +4,8 @@
 #include "BigBlindState.h"
 #include "BossBlindState.h"
 
+#include "SkipReward/RewardCommandQueue.h"
+
 #include <iostream>
 #include <cassert>
 
@@ -93,4 +95,12 @@ void BlindManager::incrementAnte()
 {
     ante++;
     std::cout << "[Blind] Ante increased to " << ante << "!\n";
+}
+
+void BlindManager::queueSkipRewards(SkipReward::RewardCommandQueue &queue)
+{
+    if (currentState)
+    {
+        currentState->queueSkipRewards(queue);
+    }
 }
