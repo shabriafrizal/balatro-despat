@@ -8,6 +8,10 @@
 #include "GameManager.h"
 #include "Joker/FlatChipJoker.h"
 #include "Joker/PairJoker.h"
+#include "Joker/MultiplierJoker.h"
+
+#include "SkipReward/RunSessionState.h"
+#include "SkipReward/CommandTiming.h"
 
 namespace
 {
@@ -80,8 +84,6 @@ namespace
 void GameManager::setupJokers()
 {
     jokerManager.clear();
-    jokerManager.addJoker(std::make_unique<PairJoker>());
-    jokerManager.addJoker(std::make_unique<FlatChipJoker>());
 }
 
 void GameManager::buildAndShuffleDeck()
@@ -122,6 +124,9 @@ void GameManager::displayCurrentHand() const
 
 void GameManager::startBlind()
 {
+    // Execute any queued NextBlind rewards
+    executePendingCommands(SkipReward::CommandTiming::NextBlind);
+
     blindRule.reset();
     blindRule.setRequiredScore(blindManager.getRequiredScore());
     handsRemaining = 4;
@@ -168,6 +173,17 @@ void GameManager::tryDiscard()
         discardsRemaining);
 }
 
+void GameManager::executePendingCommands(SkipReward::CommandTiming timing)
+{
+    SkipReward::RunSessionState state{
+        handsRemaining,
+        discardsRemaining,
+        money,
+        freeRerolls};
+
+    commandQueue.executeCommandsWithTiming(timing, state);
+}
+
 void GameManager::runSession()
 {
     std::cout << "=== Run Started ===\n";
@@ -193,10 +209,29 @@ void GameManager::runSession()
 
             if (skipChoice == "S" || skipChoice == "s")
             {
+                // Enqueue skip rewards from the current blind state
+                blindManager.queueSkipRewards(commandQueue);
+
+                // Execute Immediate commands right away
+                executePendingCommands(SkipReward::CommandTiming::Immediate);
+
+                // Show what was gained
                 std::cout << "\nSkipping " << blindManager.getCurrentBlindName()
-                          << " — forfeiting reward of "
-                          << blindManager.getReward() << ".\n";
+                          << " — gaining skip rewards!\n";
+                {
+                    const auto &pending = commandQueue.getPendingCommands();
+                    for (const auto &cmd : pending)
+                    {
+                        if (cmd.executed)
+                            std::cout << "  + " << cmd.command->getDescription() << "\n";
+                    }
+                }
+
                 blindManager.skipBlind();
+
+                // Execute NextBlind commands at the start of the next blind
+                executePendingCommands(SkipReward::CommandTiming::NextBlind);
+
                 startBlind();
                 continue; // re-evaluate skip prompt for the next blind
             }
@@ -208,30 +243,85 @@ void GameManager::runSession()
 
         while (handsRemaining > 0)
         {
-            displayCurrentHand();
-
-            std::cout << "\nHands: "
+            std::cout << "\n=== Hands: "
                       << handsRemaining
                       << " | Discards: "
                       << discardsRemaining
+                      << " | Money: $"
+                      << money
                       << " | Score: "
                       << blindRule.getAccumulatedScore()
                       << " / " << blindRule.getRequiredScore()
-                      << "\n";
+                      << " ===\n";
 
-            std::cout << "[P]lay  [D]iscard\n";
-            std::cout << "> ";
+            displayCurrentHand();
 
+            // Prompt for card indices first
+            std::cout << "\nEnter card indices (space-separated):\n> ";
+            std::string indexInput;
+            std::getline(std::cin, indexInput);
+
+            std::vector<size_t> indices;
+            {
+                std::istringstream iss(indexInput);
+                size_t idx;
+                size_t maxIdx = currentHand.getCardCount();
+                while (iss >> idx)
+                {
+                    if (idx < maxIdx)
+                        indices.push_back(idx);
+                    else
+                        std::cerr << "Warning: Index " << idx << " out of range, skipping...\n";
+                }
+            }
+
+            if (indices.empty())
+            {
+                std::cout << "No valid indices entered.\n";
+                continue;
+            }
+
+            // Then choose what to do with them
+            std::cout << "[P]lay selected  [D]iscard selected\n> ";
             std::string choice;
             std::getline(std::cin, choice);
 
             if (choice == "P" || choice == "p")
             {
-                bool blindCleared = tryPlayHand();
+                int score = handPlayer.handlePlayWithIndices(
+                    currentHand, deck, chooseHand,
+                    scoringRule, jokerManager, handsRemaining, indices);
 
-                if (blindCleared)
+                if (score < 0)
                 {
+                    continue; // invalid play, retry
+                }
+
+                blindRule.addScore(score);
+                int accumulated = blindRule.getAccumulatedScore();
+                int required = blindRule.getRequiredScore();
+                std::cout << "Blind progress: " << accumulated << " / " << required << "\n";
+
+                if (blindRule.isBlindCleared())
+                {
+                    std::cout << "\n*** " << blindManager.getCurrentBlindName()
+                              << " cleared! ***\n";
+
+                    int reward = blindManager.getReward();
+                    money += reward;
+                    std::cout << "+$" << reward << " reward earned!\n";
+
                     blindManager.advanceBlind(true);
+
+                    // Execute any queued NextAnte rewards after ante may have incremented
+                    executePendingCommands(SkipReward::CommandTiming::NextAnte);
+
+                    // Execute any queued NextShop rewards before entering shop
+                    executePendingCommands(SkipReward::CommandTiming::NextShop);
+
+                    // Display shop after defeating a blind
+                    shop.displayAndHandle(jokerManager, money);
+
                     startBlind();
                     break; // exit inner loop, start next blind
                 }
@@ -245,7 +335,9 @@ void GameManager::runSession()
             }
             else if (choice == "D" || choice == "d")
             {
-                tryDiscard();
+                handPlayer.handleDiscardWithIndices(
+                    currentHand, deck, chooseHand,
+                    discardsRemaining, indices);
             }
             else
             {

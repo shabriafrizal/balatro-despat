@@ -20,8 +20,19 @@ public:
                    ChooseHand &chooseHand, ScoringRule &scoringRule,
                    JokerManager &jokerManager, int &handsRemaining);
 
+    // Same as handlePlay but uses pre-selected indices (no prompt)
+    int handlePlayWithIndices(Hand &currentHand, std::vector<Card> &deck,
+                              ChooseHand &chooseHand, ScoringRule &scoringRule,
+                              JokerManager &jokerManager, int &handsRemaining,
+                              const std::vector<size_t> &indices);
+
     void handleDiscard(Hand &currentHand, std::vector<Card> &deck,
                        ChooseHand &chooseHand, int &discardsRemaining);
+
+    // Same as handleDiscard but uses pre-selected indices (no prompt)
+    void handleDiscardWithIndices(Hand &currentHand, std::vector<Card> &deck,
+                                  ChooseHand &chooseHand, int &discardsRemaining,
+                                  const std::vector<size_t> &indices);
 
 private:
     std::vector<size_t> promptCardSelection(

@@ -4,6 +4,8 @@
 #include "BigBlindState.h"
 #include "BossBlindState.h"
 
+#include "SkipReward/RewardCommandQueue.h"
+
 #include <iostream>
 #include <cassert>
 
@@ -85,7 +87,7 @@ void BlindManager::transitionToState(std::unique_ptr<IBlindState> newState)
 {
     currentState = std::move(newState);
     std::cout << "[Blind] Now at ante " << ante
-              << " — " << getCurrentBlindName()
+              << " " << getCurrentBlindName()
               << " (required: " << getRequiredScore() << ")\n";
 }
 
@@ -93,4 +95,12 @@ void BlindManager::incrementAnte()
 {
     ante++;
     std::cout << "[Blind] Ante increased to " << ante << "!\n";
+}
+
+void BlindManager::queueSkipRewards(SkipReward::RewardCommandQueue &queue)
+{
+    if (currentState)
+    {
+        currentState->queueSkipRewards(queue);
+    }
 }

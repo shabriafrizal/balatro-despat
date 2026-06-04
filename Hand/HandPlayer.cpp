@@ -77,6 +77,44 @@ int HandPlayer::handlePlay(
     return score;
 }
 
+int HandPlayer::handlePlayWithIndices(
+    Hand &currentHand,
+    std::vector<Card> &deck,
+    ChooseHand &chooseHand,
+    ScoringRule &scoringRule,
+    JokerManager &jokerManager,
+    int &handsRemaining,
+    const std::vector<size_t> &indices)
+{
+    if (indices.empty())
+    {
+        std::cerr << "No valid cards selected!\n";
+        return -1;
+    }
+
+    if (indices.size() > 5)
+    {
+        std::cout << "You can only play up to 5 cards!\n";
+        return -1;
+    }
+
+    Hand playedHand =
+        chooseHand.chooseFromHand(currentHand, indices);
+
+    removeCardsFromHand(currentHand, indices);
+
+    int score = resolvePlayedHand(playedHand, scoringRule, jokerManager);
+
+    handsRemaining--;
+
+    if (handsRemaining > 0)
+    {
+        drawToHand(currentHand, deck, 8);
+    }
+
+    return score;
+}
+
 void HandPlayer::handleDiscard(
     Hand &currentHand,
     std::vector<Card> &deck,
@@ -102,6 +140,40 @@ void HandPlayer::handleDiscard(
     currentHand =
         chooseHand.discardFromHand(
             currentHand, indices);
+
+    discardsRemaining--;
+
+    drawToHand(currentHand, deck, 8);
+
+    std::cout
+        << "[Debug] Drew back to "
+        << currentHand.getCardCount()
+        << " cards, "
+        << deck.size()
+        << " remaining in deck\n";
+}
+
+void HandPlayer::handleDiscardWithIndices(
+    Hand &currentHand,
+    std::vector<Card> &deck,
+    ChooseHand &chooseHand,
+    int &discardsRemaining,
+    const std::vector<size_t> &indices)
+{
+    if (discardsRemaining <= 0)
+    {
+        std::cout << "No discards remaining!\n";
+        return;
+    }
+
+    if (indices.empty())
+    {
+        std::cerr << "No valid cards selected!\n";
+        return;
+    }
+
+    currentHand =
+        chooseHand.discardFromHand(currentHand, indices);
 
     discardsRemaining--;
 

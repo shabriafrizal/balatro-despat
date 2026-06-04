@@ -25,16 +25,14 @@ flowchart TD
 
             subgraph PlayDiscardLoop["Play / Discard Loop (Inner)"]
 
+                status["show Hands/Discards/Money/Score"]
                 displayHand["displayCurrentHand()"]
-                status["show handsRemaining / discardsRemaining"]
+                promptIndices["Enter card indices<br/>(space-separated)"]
 
-                choice{"[P]lay or [D]iscard?"}
+                choice{"[P]lay selected  [D]iscard selected?"}
 
-                handlePlay["handlePlay()"]
-                handleDiscard["handleDiscard()"]
-
-                promptPlay["promptCardSelection()"]
-                promptDiscard["promptCardSelection()"]
+                handlePlay["handlePlayWithIndices()"]
+                handleDiscard["handleDiscardWithIndices()"]
 
                 choosePlay["chooseHand.chooseFromHand()"]
                 chooseDiscard["chooseHand.discardFromHand()"]
@@ -56,6 +54,8 @@ flowchart TD
             end
 
             blindComplete["Blind Cleared"]
+            collectReward["money += blindManager.getReward()<br/>+$reward earned!"]
+            showShop["shop.displayAndHandle()<br/>(buy jokers/items)"]
             advanceBlind["blindManager.advanceBlind(true)<br/>transitionToNextState()"]
 
             decBlindType{"Current blind type?"}
@@ -71,39 +71,39 @@ flowchart TD
         %% Blind cycle start
         initBlind --> blindInfo
         blindInfo --> resetHands
-        resetHands --> displayHand
+        resetHands --> status
 
         %% Main loop
-        displayHand --> status
-        status --> choice
+        status --> displayHand
+        displayHand --> promptIndices
+        promptIndices --> choice
 
         %% Play branch
         choice -- Play / P --> handlePlay
-        handlePlay --> promptPlay
-        promptPlay --> choosePlay
+        handlePlay --> choosePlay
         choosePlay --> removeCards
         removeCards --> scoreResolve
         scoreResolve --> blindCleared
 
         blindCleared -- Yes --> blindComplete
-        blindComplete --> advanceBlind
+        blindComplete --> collectReward
+        collectReward --> showShop
+        showShop --> advanceBlind
 
         blindCleared -- No --> decHandsRemaining
         decHandsRemaining -- Yes --> endLose
         decHandsRemaining -- No --> playDraw
-        playDraw --> displayHand
+        playDraw --> status
 
         %% Discard branch
         choice -- Discard / D --> handleDiscard
         handleDiscard --> decDiscards
 
-        decDiscards -- No --> displayHand
-        decDiscards -- Yes --> promptDiscard
-
-        promptDiscard --> chooseDiscard
+        decDiscards -- No --> status
+        decDiscards -- Yes --> chooseDiscard
         chooseDiscard --> decDisc
         decDisc --> discardDraw
-        discardDraw --> displayHand
+        discardDraw --> status
 
         %% Blind state transitions
         advanceBlind --> decBlindType

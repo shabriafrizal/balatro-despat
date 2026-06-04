@@ -1,7 +1,12 @@
 #pragma once
 
-// Forward declaration to avoid circular dependency
+// Forward declarations to avoid circular dependency
 class BlindManager;
+
+namespace SkipReward
+{
+    class RewardCommandQueue;
+}
 
 /**
  * Abstract interface for blind progression states.
@@ -62,4 +67,12 @@ public:
     virtual void transitionToNextState(
         BlindManager &manager,
         bool blindWon) = 0;
+
+    /**
+     * Enqueue skip-reward commands into the given queue.
+     * Called when the player chooses to skip this blind.
+     * Each blind type offers different skip rewards.
+     */
+    virtual void queueSkipRewards(
+        SkipReward::RewardCommandQueue &queue) = 0;
 };

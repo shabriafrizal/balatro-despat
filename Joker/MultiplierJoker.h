@@ -1,9 +1,12 @@
 #pragma once
 
 #include "Joker.h"
-#include "../Hand/HandRank.h"
 
-class PairJoker : public Joker
+/**
+ * Multiplier Joker: Doubles the multiplier
+ * 2x mult modifier
+ */
+class MultiplierJoker : public Joker
 {
 public:
     std::string getName() const override;

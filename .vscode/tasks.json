@@ -19,6 +19,7 @@
 				"Joker\\*.cpp",
 				"Scoring\\*.cpp",
 				"Ante\\*.cpp",
+				"Shop\\*.cpp",
 				"-o",
 				"balatro.exe"
 			]

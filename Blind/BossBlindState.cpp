@@ -2,6 +2,8 @@
 #include "SmallBlindState.h"
 #include "BlindManager.h"
 
+#include "SkipReward/RewardCommandQueue.h"
+
 BossBlindState::BossBlindState(int anteLevel)
     : ante(anteLevel)
 {
@@ -37,4 +39,9 @@ void BossBlindState::transitionToNextState(BlindManager &manager, bool blindWon)
         manager.transitionToState(
             std::make_unique<SmallBlindState>(manager.getAnteLevel()));
     }
+}
+
+void BossBlindState::queueSkipRewards(SkipReward::RewardCommandQueue & /*queue*/)
+{
+    // Boss Blinds cannot be skipped — this is never called
 }
