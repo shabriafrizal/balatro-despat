@@ -19,19 +19,22 @@ void Shop::initializeShopJokers()
     shopJokers.push_back(std::make_unique<PairJoker>());
 }
 
-bool Shop::displayAndHandle(JokerManager &jokerManager)
+bool Shop::displayAndHandle(JokerManager &jokerManager, int &money)
 {
     // Reinitialize shop jokers for this blind
     initializeShopJokers();
 
     std::cout << "\n========== SHOP ==========\n";
+    std::cout << "Your money: $" << money << "\n";
     std::cout << "Choose a joker to purchase or skip:\n\n";
 
     // Display shop items
     for (size_t i = 0; i < shopJokers.size(); ++i)
     {
+        int price = shopJokers[i]->getPrice();
         std::cout << "[" << i << "] " << shopJokers[i]->getName()
-                  << " - " << shopJokers[i]->getDescription(ScoreContext{}) << "\n";
+                  << " - $" << price << " - "
+                  << shopJokers[i]->getDescription(ScoreContext{}) << "\n";
     }
 
     std::cout << "[S]kip shop\n";
@@ -52,7 +55,17 @@ bool Shop::displayAndHandle(JokerManager &jokerManager)
         int index = std::stoi(choice);
         if (index >= 0 && index < static_cast<int>(shopJokers.size()))
         {
-            std::cout << "Purchased: " << shopJokers[index]->getName() << "\n";
+            int price = shopJokers[index]->getPrice();
+            if (money < price)
+            {
+                std::cout << "Not enough money! You have $" << money
+                          << " but this joker costs $" << price << ".\n";
+                return false;
+            }
+
+            money -= price;
+            std::cout << "Purchased: " << shopJokers[index]->getName()
+                      << " for $" << price << " (Remaining: $" << money << ")\n";
             jokerManager.addJoker(std::move(shopJokers[index]));
             return true;
         }

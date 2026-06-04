@@ -17,9 +17,11 @@ public:
 
     /**
      * Display the shop and handle purchasing
-     * Returns true if a joker was purchased, false if skipped
+     * @param jokerManager Manager to add purchased joker to
+     * @param money Player's current money (will be deducted on purchase)
+     * @return true if a joker was purchased, false if skipped
      */
-    bool displayAndHandle(JokerManager &jokerManager);
+    bool displayAndHandle(JokerManager &jokerManager, int &money);
 
 private:
     std::vector<std::unique_ptr<Joker>> shopJokers;

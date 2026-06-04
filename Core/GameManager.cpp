@@ -81,8 +81,6 @@ namespace
 void GameManager::setupJokers()
 {
     jokerManager.clear();
-    jokerManager.addJoker(std::make_unique<PairJoker>());
-    jokerManager.addJoker(std::make_unique<FlatChipJoker>());
 }
 
 void GameManager::buildAndShuffleDeck()
@@ -212,35 +210,78 @@ void GameManager::runSession()
 
         while (handsRemaining > 0)
         {
-            displayCurrentHand();
-
-            std::cout << "\nHands: "
+            std::cout << "\n=== Hands: "
                       << handsRemaining
                       << " | Discards: "
                       << discardsRemaining
-                      << " | Money: "
+                      << " | Money: $"
                       << money
                       << " | Score: "
                       << blindRule.getAccumulatedScore()
                       << " / " << blindRule.getRequiredScore()
-                      << "\n";
+                      << " ===\n";
 
-            std::cout << "[P]lay  [D]iscard\n";
-            std::cout << "> ";
+            displayCurrentHand();
 
+            // Prompt for card indices first
+            std::cout << "\nEnter card indices (space-separated):\n> ";
+            std::string indexInput;
+            std::getline(std::cin, indexInput);
+
+            std::vector<size_t> indices;
+            {
+                std::istringstream iss(indexInput);
+                size_t idx;
+                size_t maxIdx = currentHand.getCardCount();
+                while (iss >> idx)
+                {
+                    if (idx < maxIdx)
+                        indices.push_back(idx);
+                    else
+                        std::cerr << "Warning: Index " << idx << " out of range, skipping...\n";
+                }
+            }
+
+            if (indices.empty())
+            {
+                std::cout << "No valid indices entered.\n";
+                continue;
+            }
+
+            // Then choose what to do with them
+            std::cout << "[P]lay selected  [D]iscard selected\n> ";
             std::string choice;
             std::getline(std::cin, choice);
 
             if (choice == "P" || choice == "p")
             {
-                bool blindCleared = tryPlayHand();
+                int score = handPlayer.handlePlayWithIndices(
+                    currentHand, deck, chooseHand,
+                    scoringRule, jokerManager, handsRemaining, indices);
 
-                if (blindCleared)
+                if (score < 0)
                 {
+                    continue; // invalid play, retry
+                }
+
+                blindRule.addScore(score);
+                int accumulated = blindRule.getAccumulatedScore();
+                int required = blindRule.getRequiredScore();
+                std::cout << "Blind progress: " << accumulated << " / " << required << "\n";
+
+                if (blindRule.isBlindCleared())
+                {
+                    std::cout << "\n*** " << blindManager.getCurrentBlindName()
+                              << " cleared! ***\n";
+
+                    int reward = blindManager.getReward();
+                    money += reward;
+                    std::cout << "+$" << reward << " reward earned!\n";
+
                     blindManager.advanceBlind(true);
 
                     // Display shop after defeating a blind
-                    shop.displayAndHandle(jokerManager);
+                    shop.displayAndHandle(jokerManager, money);
 
                     startBlind();
                     break; // exit inner loop, start next blind
@@ -255,7 +296,9 @@ void GameManager::runSession()
             }
             else if (choice == "D" || choice == "d")
             {
-                tryDiscard();
+                handPlayer.handleDiscardWithIndices(
+                    currentHand, deck, chooseHand,
+                    discardsRemaining, indices);
             }
             else
             {

@@ -85,7 +85,7 @@ void BlindManager::transitionToState(std::unique_ptr<IBlindState> newState)
 {
     currentState = std::move(newState);
     std::cout << "[Blind] Now at ante " << ante
-              << " — " << getCurrentBlindName()
+              << " " << getCurrentBlindName()
               << " (required: " << getRequiredScore() << ")\n";
 }
 
