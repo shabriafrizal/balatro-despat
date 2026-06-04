@@ -1,6 +1,7 @@
 #include "AnteProgressionState.h"
 #include "../Blind/SmallBlindState.h"
 #include "../Blind/BlindManager.h"
+#include "../SkipReward/RewardCommandQueue.h"
 
 AnteProgressionState::AnteProgressionState(int currentAnte)
     : ante(currentAnte)
@@ -23,6 +24,11 @@ const char *AnteProgressionState::getName() const
     return "Ante Progression";
 }
 
+bool AnteProgressionState::canSkip() const
+{
+    return false; // Ante progression cannot be skipped
+}
+
 void AnteProgressionState::transitionToNextState(BlindManager &manager, bool blindWon)
 {
     if (blindWon)
@@ -33,4 +39,9 @@ void AnteProgressionState::transitionToNextState(BlindManager &manager, bool bli
         manager.transitionToState(
             std::make_unique<SmallBlindState>(manager.getAnteLevel()));
     }
+}
+
+void AnteProgressionState::queueSkipRewards(SkipReward::RewardCommandQueue & /*queue*/)
+{
+    // Ante Progression cannot be skipped — this is never called
 }

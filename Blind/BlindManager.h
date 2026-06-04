@@ -4,6 +4,12 @@
 
 #include "IBlindState.h"
 
+// Forward declare
+namespace SkipReward
+{
+    class RewardCommandQueue;
+}
+
 /**
  * Manages blind progression state and transitions.
  *
@@ -77,6 +83,12 @@ public:
      * Has no effect if the current blind cannot be skipped.
      */
     void skipBlind();
+
+    /**
+     * Enqueue skip-reward commands from the current blind state
+     * into the given queue. Does nothing if no state is active.
+     */
+    void queueSkipRewards(SkipReward::RewardCommandQueue &queue);
 
     /**
      * Advance blind progression to the next state.

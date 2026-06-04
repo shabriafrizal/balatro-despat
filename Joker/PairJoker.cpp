@@ -12,7 +12,12 @@ std::string PairJoker::getDescription(const ScoreContext &context) const
         return "Pair: +4 mult";
     }
 
-    return "Pair: +4 mult (inactive)";
+    return "Pair: +4 mult";
+}
+
+int PairJoker::getPrice() const
+{
+    return 3;
 }
 
 void PairJoker::onScoreCalculated(ScoreContext &context)
