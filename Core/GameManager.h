@@ -10,6 +10,7 @@
 #include "Hand/ChooseHand.h"
 #include "Joker/JokerManager.h"
 #include "Blind/BlindManager.h"
+#include "Shop/Shop.h"
 
 class GameManager
 {
@@ -40,12 +41,14 @@ private:
     ChooseHand chooseHand;
     JokerManager jokerManager;
     BlindManager blindManager;
+    Shop shop;
 
     Hand currentHand;
     std::vector<Card> deck;
 
     int handsRemaining = 4;
     int discardsRemaining = 3;
+    int money = 0;
 
     bool runWon = false;
 };

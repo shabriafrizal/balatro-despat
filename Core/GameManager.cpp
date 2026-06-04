@@ -8,6 +8,7 @@
 #include "GameManager.h"
 #include "Joker/FlatChipJoker.h"
 #include "Joker/PairJoker.h"
+#include "Joker/MultiplierJoker.h"
 
 namespace
 {
@@ -194,8 +195,11 @@ void GameManager::runSession()
             if (skipChoice == "S" || skipChoice == "s")
             {
                 std::cout << "\nSkipping " << blindManager.getCurrentBlindName()
-                          << " — forfeiting reward of "
-                          << blindManager.getReward() << ".\n";
+                          << " — but gaining skip rewards!\n";
+                std::cout << "+1 Hand | +1 Discard | +10 Money\n";
+                handsRemaining += 1;
+                discardsRemaining += 1;
+                money += 10;
                 blindManager.skipBlind();
                 startBlind();
                 continue; // re-evaluate skip prompt for the next blind
@@ -214,6 +218,8 @@ void GameManager::runSession()
                       << handsRemaining
                       << " | Discards: "
                       << discardsRemaining
+                      << " | Money: "
+                      << money
                       << " | Score: "
                       << blindRule.getAccumulatedScore()
                       << " / " << blindRule.getRequiredScore()
@@ -232,6 +238,10 @@ void GameManager::runSession()
                 if (blindCleared)
                 {
                     blindManager.advanceBlind(true);
+
+                    // Display shop after defeating a blind
+                    shop.displayAndHandle(jokerManager);
+
                     startBlind();
                     break; // exit inner loop, start next blind
                 }
