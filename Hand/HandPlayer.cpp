@@ -265,4 +265,5 @@ void HandPlayer::drawToHand(
         currentHand.addCard(deck.back());
         deck.pop_back();
     }
+    currentHand.sortByRank();
 }
