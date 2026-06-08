@@ -128,6 +128,10 @@ void GameManager::startBlind()
     // Execute any queued NextBlind rewards
     executePendingCommands(SkipReward::CommandTiming::NextBlind);
 
+    // Rebuild and shuffle a fresh deck for this blind
+    currentHand.clear();
+    buildAndShuffleDeck();
+
     blindRule.reset();
     blindRule.setRequiredScore(blindManager.getRequiredScore());
     handsRemaining = 4;
@@ -190,7 +194,6 @@ void GameManager::runSession()
     std::cout << "=== Run Started ===\n";
 
     setupJokers();
-    buildAndShuffleDeck();
     blindManager.initializeProgression();
 
     startBlind();
