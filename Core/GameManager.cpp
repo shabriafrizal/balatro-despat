@@ -109,6 +109,7 @@ void GameManager::drawToHand(size_t targetCount)
         currentHand.addCard(deck.back());
         deck.pop_back();
     }
+    currentHand.sortByRank();
 }
 
 void GameManager::displayCurrentHand() const
