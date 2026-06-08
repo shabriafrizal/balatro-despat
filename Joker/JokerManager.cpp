@@ -1,23 +1,23 @@
 #include "JokerManager.h"
 
-void JokerManager::addJoker(std::unique_ptr<Joker> joker)
+void JokerManager::attach(std::unique_ptr<Joker> observer)
 {
-    if (joker)
+    if (observer)
     {
-        jokers.push_back(std::move(joker));
+        observers.push_back(std::move(observer));
     }
 }
 
 void JokerManager::clear()
 {
-    jokers.clear();
+    observers.clear();
 }
 
-void JokerManager::applyJokers(ScoreContext &context)
+void JokerManager::notifyJokers(ScoreContext &context)
 {
-    for (const auto &joker : jokers)
+    for (const auto &observer : observers)
     {
-        joker->onScoreCalculated(context);
+        observer->onScoreCalculated(context);
     }
 
     context.recomputeFinalScore();
@@ -25,5 +25,5 @@ void JokerManager::applyJokers(ScoreContext &context)
 
 const std::vector<std::unique_ptr<Joker>> &JokerManager::getJokers() const
 {
-    return jokers;
+    return observers;
 }

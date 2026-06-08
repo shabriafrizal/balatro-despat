@@ -6,12 +6,12 @@ Balatro is a C++17 terminal-based poker roguelike. The player draws cards, plays
 
 **Key design patterns in use:**
 
-| Pattern                     | Where                                                  |
-| --------------------------- | ------------------------------------------------------ |
-| **State Pattern**           | Blind progression (`IBlindState` → Small / Big / Boss) |
-| **Chain of Responsibility** | Poker hand evaluation (checker chain)                  |
-| **Command Pattern**         | Skip rewards (`SkipReward::RewardCommand`)             |
-| **Strategy Pattern**        | Joker effects (`Joker::onScoreCalculated`)             |
+| Pattern                     | Where                                                                |
+| --------------------------- | -------------------------------------------------------------------- |
+| **State Pattern**           | Blind progression (`IBlindState` → Small / Big / Boss)               |
+| **Chain of Responsibility** | Poker hand evaluation (checker chain)                                |
+| **Command Pattern**         | Skip rewards (`SkipReward::RewardCommand`)                           |
+| **Observer Pattern**        | Joker scoring (`IScoreObserver` → `Joker`, Subject = `JokerManager`) |
 
 ---
 
@@ -31,7 +31,7 @@ Balatro is a C++17 terminal-based poker roguelike. The player draws cards, plays
 | `PokerHandChecker`   | Chain-of-responsibility poker hand detection                                        |
 | `ScoringRule`        | Runs the checker chain and calculates base chips + mult                             |
 | `ScoreContext`       | Mutable score data used by jokers for modification                                  |
-| `JokerManager`       | Owns jokers and applies all effects to a `ScoreContext`                             |
+| `JokerManager`       | Subject: owns jokers, notifies all observers on scoring events                      |
 | `Shop`               | Displays purchasable jokers after each cleared blind                                |
 | `RewardCommandQueue` | Stores deferred skip-reward commands, executes at checkpoints                       |
 
@@ -39,27 +39,54 @@ Balatro is a C++17 terminal-based poker roguelike. The player draws cards, plays
 
 ## Runtime Flow
 
+```mermaid
+flowchart LR
+    A["main()"] --> B["setupJokers()"]
+    B --> C["buildAndShuffleDeck()"]
+    C --> D["initializeProgression()"]
+    D --> E["startBlind()"]
+    E --> F{{"Skip?"}}
+    F -->|"Yes"| G["queue + execute Immediate"]
+    G --> H["skipBlind()"]
+    H --> E
+    F -->|"No"| I["drawToHand(8)"]
+    I --> J{{"Play or Discard?"}}
+    J -->|"Play"| K["handlePlayWithIndices()"]
+    K --> L{{"Cleared?"}}
+    L -->|"Yes"| M["reward → advance → shop"]
+    M --> E
+    L -->|"No / hands=0"| N["Lose"]
+    J -->|"Discard"| O["handleDiscardWithIndices()"]
+    O --> I
+```
+
 ```
 main() → GameManager::runSession()
-    → setupJokers()
-    → buildAndShuffleDeck()
-    → blindManager.initializeProgression()
-    → startBlind()
+    → setupJokers()                    // clears any existing jokers
+    → buildAndShuffleDeck()            // 52 cards, std::mt19937
+    → blindManager.initializeProgression()  // ante=1, SmallBlindState
+    → startBlind()                     // reset score, set required, exec NextBlind commands
 
     Outer loop (per blind):
-        ├─ drawToHand(8)
-        ├─ [S]kip prompt (if blind allows)
-        │    └─ queueSkipRewards() → executePendingCommands(Immediate)
+        ├─ Skip prompt (if blind allows skipping)
+        │    ├─ [S]kip → queueSkipRewards() → executePendingCommands(Immediate)
+        │    │        → skipBlind() → executePendingCommands(NextBlind) → startBlind() → continue
+        │    └─ [C]ontinue → fall through
+        ├─ drawToHand(8)  (replenish to 8 cards)
         ├─ Inner loop (per action):
         │    ├─ Display stats + hand
         │    ├─ Prompt for card indices
         │    ├─ [P]lay or [D]iscard selected?
-        │    ├─ PLAY  → handlePlayWithIndices() → resolve → add score → check blind cleared
-        │    └─ DISCARD → handleDiscardWithIndices() → replace cards → reduce discards
+        │    ├─ PLAY  → handlePlayWithIndices() → choose + remove + resolve
+        │    │        → blindRule.addScore() → check isBlindCleared()
+        │    │        → if not cleared and hands>0: drawToHand(8), loop
+        │    └─ DISCARD → handleDiscardWithIndices() → remove cards
+        │                → discardsRemaining-- → drawToHand(8), loop
         │
         ├─ Blind cleared?
-        │    ├─ Yes → +reward money → advanceBlind() → execute NextAnte/NextShop → Shop → startBlind()
-        │    └─ No (hands=0) → Run Ended (Lose)
+        │    ├─ Yes → +reward money → advanceBlind(true)
+        │    │       → execute NextAnte → execute NextShop → Shop → startBlind()
+        │    └─ No (handsRemaining=0) → Run Ended (Lose)
 ```
 
 ---
@@ -74,10 +101,7 @@ The runtime is split into three major stages:
 setupJokers() → buildAndShuffleDeck() → blindManager.initializeProgression() → startBlind()
 ```
 
-**`setupJokers()`** — Registers starting jokers:
-
-- `FlatChipJoker` (+20 chips, always active)
-- `PairJoker` (+4 mult when hand is a Pair)
+**`setupJokers()`** — Clears any existing jokers via `jokerManager.clear()`. No starting jokers are registered by default; jokers are acquired through the shop after clearing blinds.
 
 **`buildAndShuffleDeck()`** — Creates a standard 52-card deck (4 suits × 13 ranks) and shuffles with `std::mt19937`.
 
@@ -106,7 +130,7 @@ indices → chooseHand.chooseFromHand() → removeCardsFromHand()
               ├─ checker chain determines HandRank
               ├─ HandScoreTable returns {chips, mult}
               ├─ card ranks add chip values (2-10=face, J/Q/K=10, A=11)
-              ├─ ScoreContext created → JokerManager::applyJokers()
+              ├─ ScoreContext created → JokerManager::notifyJokers()
               └─ finalScore = chips × mult
          → blindRule.addScore(score)
          → handsRemaining--
@@ -181,7 +205,7 @@ Orchestrates the PLAY/DISCARD pipeline. Two entry points:
 Internal helpers:
 
 - `removeCardsFromHand()` — removes played cards by index (sorted descending)
-- `resolvePlayedHand()` — calls `ScoringRule::scoreHand()` then `JokerManager::applyJokers()`
+- `resolvePlayedHand()` — calls `ScoringRule::scoreHand()` then `JokerManager::notifyJokers()`
 - `drawToHand()` — draws from deck until hand reaches target count
 
 ---
@@ -249,6 +273,18 @@ Helper: `countRanksWithCount(analysis, n)` — counts how many ranks appear exac
 
 ## Scoring System
 
+```mermaid
+flowchart TD
+    A["ScoringRule::calculateBaseScore(hand)"] --> B["Build checker chain"]
+    B --> C["checkChain(hand) → HandRank"]
+    C --> D["HandScoreTable::getScore(rank)"]
+    D --> E["Add card-rank chip values"]
+    E --> F["BaseScore{handType, chips, multiplier}"]
+    F --> G["ScoreContext created"]
+    G --> H["JokerManager::notifyJokers(ctx)"]
+    H --> I["recomputeFinalScore()<br/>finalScore = chips × multiplier"]
+```
+
 ### `ScoringRule` (`Scoring/ScoringRule.h`)
 
 ```
@@ -300,27 +336,46 @@ struct ScoreContext {
 
 ## Joker System
 
-### `Joker` (`Joker/Joker.h`)
+### Observer Pattern
 
-Abstract base:
+Joker scoring uses the **Observer Pattern**:
+
+- **Subject**: `JokerManager` — maintains a list of `IScoreObserver` instances and calls `notifyJokers()` when a hand is scored.
+- **Observer**: `Joker` (via `IScoreObserver`) — each joker implements `onScoreCalculated()` to react to scoring events.
+
+This decouples scoring from joker effects: the scoring pipeline fires an event, and all attached jokers independently react.
+
+### `IScoreObserver` (`Scoring/IScoreObserver.h`)
 
 ```cpp
-class Joker {
+class IScoreObserver {
+    virtual void onScoreCalculated(ScoreContext &context) = 0;
+};
+```
+
+### `Joker` (`Joker/Joker.h`)
+
+Abstract observer that also provides joker metadata:
+
+```cpp
+class Joker : public IScoreObserver {
     virtual std::string getName() const = 0;
     virtual std::string getDescription(const ScoreContext&) const = 0;
     virtual int getPrice() const = 0;
-    virtual void onScoreCalculated(ScoreContext &context) = 0;
+    // onScoreCalculated() inherited from IScoreObserver
 };
 ```
 
 ### `JokerManager` (`Joker/JokerManager.h`)
 
-| Method                 | Purpose                                                                |
-| ---------------------- | ---------------------------------------------------------------------- |
-| `addJoker(joker)`      | Owns and stores the joker                                              |
-| `applyJokers(context)` | Calls `onScoreCalculated` on every joker, then `recomputeFinalScore()` |
-| `clear()`              | Removes all jokers                                                     |
-| `getJokers()`          | Returns const ref to joker list                                        |
+The **Subject** in the Observer Pattern:
+
+| Method                  | Purpose                                                                            |
+| ----------------------- | ---------------------------------------------------------------------------------- |
+| `attach(observer)`      | Register a Joker observer to be notified on scoring events                         |
+| `notifyJokers(context)` | Calls `onScoreCalculated` on every attached observer, then `recomputeFinalScore()` |
+| `clear()`               | Removes all observers                                                              |
+| `getJokers()`           | Returns const ref to observer list                                                 |
 
 ### Built-in Jokers
 
@@ -330,7 +385,7 @@ class Joker {
 | `PairJoker`       | HandRank == PAIR | `multiplier += 4` | $7    |
 | `MultiplierJoker` | Always           | `multiplier *= 2` | $7    |
 
-Joker flow: **Base Score → JokerManager::applyJokers() → each Joker::onScoreCalculated() → recomputeFinalScore()**
+Joker flow: **Base Score → JokerManager::notifyJokers() → each Joker::onScoreCalculated() → recomputeFinalScore()**
 
 ---
 
@@ -355,18 +410,26 @@ class IBlindState {
 
 ### Blind Progression Cycle
 
+```mermaid
+flowchart LR
+    S["SmallBlindState"] -->|"won"| B["BigBlindState"]
+    B -->|"won"| O["BossBlindState"]
+    O -->|"won / ante++"| S
+```
+
 ```
 SmallBlindState → BigBlindState → BossBlindState (ante++) → SmallBlindState (next ante)
 ```
 
+> **Note:** `AnteProgressionState` exists in the codebase (`Ante/`) but is **not wired** into the current progression chain. The Boss blind transitions directly to SmallBlindState after incrementing the ante.
+
 ### Per-Blind Values (ante = 1)
 
-| State                  | Req Score     | Clear Reward  | Can Skip? | Skip Reward      |
-| ---------------------- | ------------- | ------------- | --------- | ---------------- |
-| `SmallBlindState`      | 300 × ante    | 25 × ante     | Yes       | `+$10` Immediate |
-| `BigBlindState`        | 450 × ante    | 50 × ante     | Yes       | `+$25` Immediate |
-| `BossBlindState`       | 600 × ante    | 100 × ante    | **No**    | N/A              |
-| `AnteProgressionState` | 400 + ante×50 | 100 + ante×10 | **No**    | N/A              |
+| State             | Req Score  | Clear Reward | Can Skip? | Skip Reward      |
+| ----------------- | ---------- | ------------ | --------- | ---------------- |
+| `SmallBlindState` | 300 × ante | 25 × ante    | Yes       | `+$10` Immediate |
+| `BigBlindState`   | 450 × ante | 50 × ante    | Yes       | `+$25` Immediate |
+| `BossBlindState`  | 600 × ante | 100 × ante   | **No**    | N/A              |
 
 ### `BlindManager` (`Blind/BlindManager.h`)
 
@@ -423,6 +486,19 @@ A single `if/else` or `switch` would not scale. The Command Pattern encapsulates
 
 ### Execution Flow (Skip)
 
+```mermaid
+flowchart TD
+    A["Player picks [S]kip"] --> B["blindManager.queueSkipRewards()"]
+    B --> C["enqueues Immediate commands<br/>(e.g. BonusMoneyCommand)"]
+    C --> D["executePendingCommands(Immediate)"]
+    D --> E["builds RunSessionState<br/>executes all Immediate commands"]
+    E --> F["blindManager.skipBlind()"]
+    F --> G["calls transitionToNextState(true)"]
+    G --> H["executePendingCommands(NextBlind)"]
+    H --> I["startBlind()"]
+    I --> J["also runs executePendingCommands(NextBlind)<br/>(idempotent — already-executed skipped)"]
+```
+
 ```
 Player picks [S]kip
     → blindManager.queueSkipRewards(commandQueue)
@@ -431,11 +507,23 @@ Player picks [S]kip
          → builds RunSessionState{handsRemaining, discardsRemaining, money, freeRerolls}
          → executes all Immediate-timed commands
     → blindManager.skipBlind()
+         → currentState->transitionToNextState(true)
+    → executePendingCommands(NextBlind)
     → startBlind()
-         → executePendingCommands(NextBlind)
+         → executePendingCommands(NextBlind)  (idempotent — already-marked executed skipped)
 ```
 
 ### Execution Flow (Blind Cleared)
+
+```mermaid
+flowchart LR
+    A["Blind Cleared"] --> B["money += reward"]
+    B --> C["advanceBlind(true)"]
+    C --> D["exec NextAnte"]
+    D --> E["exec NextShop"]
+    E --> F["Shop opens"]
+    F --> G["startBlind() → exec NextBlind"]
+```
 
 ```
 Blind cleared
@@ -444,6 +532,7 @@ Blind cleared
     → executePendingCommands(NextAnte)
     → executePendingCommands(NextShop)
     → Shop opens
+    → startBlind() → executePendingCommands(NextBlind)
 ```
 
 ### Checkpoint Table
@@ -469,7 +558,7 @@ Appears after every cleared blind. Offers 3 jokers:
 | [1]  | `FlatChipJoker` (+20 chips)    | $1    |
 | [2]  | `PairJoker` (+4 mult on pairs) | $7    |
 
-Player can buy one or skip. Purchased jokers are added to `JokerManager` via `addJoker()`.
+Player can buy one or skip. Purchased jokers are attached to `JokerManager` via `attach()`.
 
 ---
 
@@ -477,7 +566,7 @@ Player can buy one or skip. Purchased jokers are added to `JokerManager` via `ad
 
 ### Adding a New Joker
 
-1. **Create a class** inheriting from `Joker`:
+1. **Create a class** inheriting from `Joker` (which implements `IScoreObserver`):
 
    ```cpp
    // Joker/MyJoker.h
@@ -489,9 +578,9 @@ Player can buy one or skip. Purchased jokers are added to `JokerManager` via `ad
    };
    ```
 
-2. **Register** in `GameManager::setupJokers()` or add to `Shop::initializeShopJokers()`:
+2. **Attach** to the Subject in `GameManager::setupJokers()` or add to `Shop::initializeShopJokers()`:
    ```cpp
-   jokerManager.addJoker(std::make_unique<MyJoker>());
+   jokerManager.attach(std::make_unique<MyJoker>());
    ```
 
 ### Adding a New Poker Hand

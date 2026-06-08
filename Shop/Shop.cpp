@@ -66,7 +66,7 @@ bool Shop::displayAndHandle(JokerManager &jokerManager, int &money)
             money -= price;
             std::cout << "Purchased: " << shopJokers[index]->getName()
                       << " for $" << price << " (Remaining: $" << money << ")\n";
-            jokerManager.addJoker(std::move(shopJokers[index]));
+            jokerManager.attach(std::move(shopJokers[index]));
             return true;
         }
     }

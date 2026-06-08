@@ -233,7 +233,7 @@ int HandPlayer::resolvePlayedHand(
     scoreContext.multiplier = baseScore.multiplier;
     scoreContext.recomputeFinalScore();
 
-    jokerManager.applyJokers(scoreContext);
+    jokerManager.notifyJokers(scoreContext);
 
     std::cout
         << "Hand type: "

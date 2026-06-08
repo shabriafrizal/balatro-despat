@@ -4,28 +4,35 @@ flowchart TD
     main["main()"] --> runSession["GameManager::runSession()"]
 
     subgraph SessionSetup["Session Setup"]
-        setupJokers["setupJokers()<br/>adds FlatChipJoker + PairJoker"]
-        buildDeck["buildAndShuffleDeck()<br/>52 cards"]
-        drawInitial["drawToHand(8)"]
+        setupJokers["setupJokers()<br/>clears existing jokers"]
+        buildDeck["buildAndShuffleDeck()<br/>52 cards, std::mt19937"]
+        initBlind["blindManager.initializeProgression()<br/>(ante=1, SmallBlindState)"]
     end
 
     runSession --> setupJokers
     setupJokers --> buildDeck
-    buildDeck --> drawInitial
-    drawInitial --> initBlind
+    buildDeck --> initBlind
 
     subgraph AnteProgression["Ante / Blind Progression (Outer Loop)"]
 
-        initBlind["blindManager.initializeProgression()<br/>(ante = 1, start at Small Blind)"]
+        subgraph BlindCycle["Blind Cycle: Small → Big → Boss → Small (next ante)"]
 
-        subgraph BlindCycle["Blind Cycle: Small → Big → Boss → Ante+"]
+            startB["startBlind()"]
+            skipCheck{{"canSkipCurrentBlind()?"}}
 
-            blindInfo["Show Blind<br/>{name} | Req: {score} | Reward: {reward}"]
-            resetHands["Reset handsRemaining = 4<br/>discardsRemaining = 3"]
+            subgraph SkipFlow["Skip Flow"]
+                skipPrompt["Prompt: [S]kip or [C]ontinue?"]
+                skipChosen{"Player chose Skip?"}
+                queueRewards["queueSkipRewards() → enqueue commands"]
+                execImmediate["executePendingCommands(Immediate)<br/>(e.g. +$10, +$25)"]
+                doSkip["blindManager.skipBlind()<br/>transitionToNextState()"]
+            end
+
+            drawFull["drawToHand(8)<br/>(replenish cards)"]
 
             subgraph PlayDiscardLoop["Play / Discard Loop (Inner)"]
 
-                status["show Hands/Discards/Money/Score"]
+                status["Status: Hands | Discards | Money | Score"]
                 displayHand["displayCurrentHand()"]
                 promptIndices["Enter card indices<br/>(space-separated)"]
 
@@ -34,60 +41,78 @@ flowchart TD
                 handlePlay["handlePlayWithIndices()"]
                 handleDiscard["handleDiscardWithIndices()"]
 
-                choosePlay["chooseHand.chooseFromHand()"]
-                chooseDiscard["chooseHand.discardFromHand()"]
+                choosePlay["chooseHand.chooseFromHand()<br/>select cards by index"]
+                chooseDiscard["chooseHand.discardFromHand()<br/>remove cards by index"]
 
-                removeCards["removeCardsFromHand()"]
-                scoreResolve["resolvePlayedHand()"]
+                removeCards["removeCardsFromHand()<br/>(sorted descending)"]
+                scoreResolve["resolvePlayedHand()<br/>checker chain → base score<br/>→ JokerManager.notifyJokers()"]
+                addScore["blindRule.addScore(score)<br/>handsRemaining--"]
 
-                blindCleared{"Accumulated Score ≥ Required?"}
+                blindCleared{"blindRule.isBlindCleared()?"}
 
                 decHandsRemaining{"handsRemaining == 0?"}
-				endLose["Run Ended (Lose)"]
-                decDiscards{"discardsRemaining > 0?"}
+                endLose["Run Ended (Lose)"]
 
-                discardDraw["drawToHand(8)<br/>(draw back up)"]
-                playDraw["drawToHand(8)<br/>(draw back up)"]
+                decDiscards{"discardsRemaining > 0?"}
                 decDisc["discardsRemaining--"]
 
+                playDraw["drawToHand(8)<br/>(draw back up)"]
+                discardDraw["drawToHand(8)<br/>(draw back up)"]
 
             end
 
             blindComplete["Blind Cleared"]
-            collectReward["money += blindManager.getReward()<br/>+$reward earned!"]
-            showShop["shop.displayAndHandle()<br/>(buy jokers/items)"]
+            collectReward["money += blindManager.getReward()"]
+            execAnte["executePendingCommands(NextAnte)"]
+            execShop["executePendingCommands(NextShop)"]
+            showShop["shop.displayAndHandle()<br/>(buy 1 joker or skip)"]
             advanceBlind["blindManager.advanceBlind(true)<br/>transitionToNextState()"]
 
             decBlindType{"Current blind type?"}
 
-            toBig["BigBlindState"]
-            toBoss["BossBlindState"]
-            toAnte["AnteProgressionState"]
+            toBig["→ BigBlindState"]
+            toBoss["→ BossBlindState"]
             incAnte["incrementAnte()<br/>(ante++)"]
-            toSmall["SmallBlindState<br/>(new ante cycle)"]
+            toSmall["→ SmallBlindState<br/>(new ante cycle)"]
 
         end
 
-        %% Blind cycle start
-        initBlind --> blindInfo
-        blindInfo --> resetHands
-        resetHands --> status
+        %% Session start → first blind
+        initBlind --> startB
 
-        %% Main loop
+        %% startBlind: reset score, set required, execute NextBlind commands
+        startB --> skipCheck
+
+        %% Skip branch — only for Small/Big blinds
+        skipCheck -- Yes --> skipPrompt
+        skipPrompt --> skipChosen
+        skipChosen -- Skip (S) --> queueRewards
+        queueRewards --> execImmediate
+        execImmediate --> doSkip
+        doSkip --> startB
+
+        skipChosen -- Continue (C) --> drawFull
+        skipCheck -- No (Boss) --> drawFull
+
+        %% Inner loop
+        drawFull --> status
         status --> displayHand
         displayHand --> promptIndices
         promptIndices --> choice
 
         %% Play branch
-        choice -- Play / P --> handlePlay
+        choice -- Play (P) --> handlePlay
         handlePlay --> choosePlay
         choosePlay --> removeCards
         removeCards --> scoreResolve
-        scoreResolve --> blindCleared
+        scoreResolve --> addScore
+        addScore --> blindCleared
 
         blindCleared -- Yes --> blindComplete
         blindComplete --> collectReward
-        collectReward --> showShop
+        collectReward --> execAnte
+        execAnte --> execShop
+        execShop --> showShop
         showShop --> advanceBlind
 
         blindCleared -- No --> decHandsRemaining
@@ -96,10 +121,10 @@ flowchart TD
         playDraw --> status
 
         %% Discard branch
-        choice -- Discard / D --> handleDiscard
+        choice -- Discard (D) --> handleDiscard
         handleDiscard --> decDiscards
 
-        decDiscards -- No --> status
+        decDiscards -- No (0 left) --> status
         decDiscards -- Yes --> chooseDiscard
         chooseDiscard --> decDisc
         decDisc --> discardDraw
@@ -110,15 +135,12 @@ flowchart TD
 
         decBlindType -- SmallBlindState --> toBig
         decBlindType -- BigBlindState --> toBoss
-        decBlindType -- BossBlindState --> toAnte
-
-        decBlindType -- AnteProgressionState --> incAnte
+        decBlindType -- BossBlindState --> incAnte
         incAnte --> toSmall
 
-        toBig --> blindInfo
-        toBoss --> blindInfo
-        toAnte --> blindInfo
-        toSmall --> blindInfo
+        toBig --> startB
+        toBoss --> startB
+        toSmall --> startB
 
     end
 ```
