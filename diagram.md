@@ -5,19 +5,17 @@ flowchart TD
 
     subgraph SessionSetup["Session Setup"]
         setupJokers["setupJokers()<br/>clears existing jokers"]
-        buildDeck["buildAndShuffleDeck()<br/>52 cards, std::mt19937"]
         initBlind["blindManager.initializeProgression()<br/>(ante=1, SmallBlindState)"]
     end
 
     runSession --> setupJokers
-    setupJokers --> buildDeck
-    buildDeck --> initBlind
+    setupJokers --> initBlind
 
     subgraph AnteProgression["Ante / Blind Progression (Outer Loop)"]
 
         subgraph BlindCycle["Blind Cycle: Small → Big → Boss → Small (next ante)"]
 
-            startB["startBlind()"]
+            startB["startBlind()<br/>clear hand, rebuild & shuffle deck<br/>reset score/hands/discards"]
             skipCheck{{"canSkipCurrentBlind()?"}}
 
             subgraph SkipFlow["Skip Flow"]
@@ -28,7 +26,7 @@ flowchart TD
                 doSkip["blindManager.skipBlind()<br/>transitionToNextState()"]
             end
 
-            drawFull["drawToHand(8)<br/>(replenish cards)"]
+            drawFull["drawToHand(8) → sortByRank()<br/>(replenish cards, sort desc)"]
 
             subgraph PlayDiscardLoop["Play / Discard Loop (Inner)"]
 
@@ -56,8 +54,8 @@ flowchart TD
                 decDiscards{"discardsRemaining > 0?"}
                 decDisc["discardsRemaining--"]
 
-                playDraw["drawToHand(8)<br/>(draw back up)"]
-                discardDraw["drawToHand(8)<br/>(draw back up)"]
+                playDraw["drawToHand(8) → sortByRank()<br/>(draw back up, sort desc)"]
+                discardDraw["drawToHand(8) → sortByRank()<br/>(draw back up, sort desc)"]
 
             end
 

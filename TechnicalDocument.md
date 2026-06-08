@@ -42,46 +42,44 @@ Balatro is a C++17 terminal-based poker roguelike. The player draws cards, plays
 ```mermaid
 flowchart LR
     A["main()"] --> B["setupJokers()"]
-    B --> C["buildAndShuffleDeck()"]
-    C --> D["initializeProgression()"]
-    D --> E["startBlind()"]
-    E --> F{{"Skip?"}}
-    F -->|"Yes"| G["queue + execute Immediate"]
-    G --> H["skipBlind()"]
-    H --> E
-    F -->|"No"| I["drawToHand(8)"]
-    I --> J{{"Play or Discard?"}}
-    J -->|"Play"| K["handlePlayWithIndices()"]
-    K --> L{{"Cleared?"}}
-    L -->|"Yes"| M["reward → advance → shop"]
-    M --> E
-    L -->|"No / hands=0"| N["Lose"]
-    J -->|"Discard"| O["handleDiscardWithIndices()"]
-    O --> I
+    B --> C["initializeProgression()"]
+    C --> D["startBlind()<br/>(clear hand, build & shuffle deck)"]
+    D --> E{{"Skip?"}}
+    E -->|"Yes"| F["queue + execute Immediate"]
+    F --> G["skipBlind()"]
+    G --> D
+    E -->|"No"| H["drawToHand(8) → sortByRank()"]
+    H --> I{{"Play or Discard?"}}
+    I -->|"Play"| J["handlePlayWithIndices()"]
+    J --> K{{"Cleared?"}}
+    K -->|"Yes"| L["reward → advance → shop"]
+    L --> D
+    K -->|"No / hands=0"| M["Lose"]
+    I -->|"Discard"| N["handleDiscardWithIndices()"]
+    N --> H
 ```
 
 ```
 main() → GameManager::runSession()
     → setupJokers()                    // clears any existing jokers
-    → buildAndShuffleDeck()            // 52 cards, std::mt19937
     → blindManager.initializeProgression()  // ante=1, SmallBlindState
-    → startBlind()                     // reset score, set required, exec NextBlind commands
+    → startBlind()                     // clear hand, build & shuffle deck, reset score
 
     Outer loop (per blind):
         ├─ Skip prompt (if blind allows skipping)
         │    ├─ [S]kip → queueSkipRewards() → executePendingCommands(Immediate)
         │    │        → skipBlind() → executePendingCommands(NextBlind) → startBlind() → continue
         │    └─ [C]ontinue → fall through
-        ├─ drawToHand(8)  (replenish to 8 cards)
+        ├─ drawToHand(8)  (replenish to 8 cards, then sortByRank desc)
         ├─ Inner loop (per action):
-        │    ├─ Display stats + hand
+        │    ├─ Display stats + hand (sorted by rank)
         │    ├─ Prompt for card indices
         │    ├─ [P]lay or [D]iscard selected?
         │    ├─ PLAY  → handlePlayWithIndices() → choose + remove + resolve
         │    │        → blindRule.addScore() → check isBlindCleared()
-        │    │        → if not cleared and hands>0: drawToHand(8), loop
+        │    │        → if not cleared and hands>0: drawToHand(8) + sortByRank(), loop
         │    └─ DISCARD → handleDiscardWithIndices() → remove cards
-        │                → discardsRemaining-- → drawToHand(8), loop
+        │                → discardsRemaining-- → drawToHand(8) + sortByRank(), loop
         │
         ├─ Blind cleared?
         │    ├─ Yes → +reward money → advanceBlind(true)
@@ -98,16 +96,14 @@ The runtime is split into three major stages:
 ### 1. Session Setup
 
 ```
-setupJokers() → buildAndShuffleDeck() → blindManager.initializeProgression() → startBlind()
+setupJokers() → blindManager.initializeProgression() → startBlind()
 ```
 
 **`setupJokers()`** — Clears any existing jokers via `jokerManager.clear()`. No starting jokers are registered by default; jokers are acquired through the shop after clearing blinds.
 
-**`buildAndShuffleDeck()`** — Creates a standard 52-card deck (4 suits × 13 ranks) and shuffles with `std::mt19937`.
-
 **`blindManager.initializeProgression()`** — Sets `ante = 1`, creates `SmallBlindState(1)`.
 
-**`startBlind()`** — Resets `handsRemaining = 4`, `discardsRemaining = 3`, resets `BlindRule` accumulated score, displays blind info.
+**`startBlind()`** — Clears the current hand, rebuilds and shuffles a fresh 52-card deck, resets `handsRemaining = 4`, `discardsRemaining = 3`, resets `BlindRule` accumulated score, displays blind info. Called at the beginning of every blind (including the first).
 
 ### 2. Main Gameplay Loop
 
@@ -134,7 +130,7 @@ indices → chooseHand.chooseFromHand() → removeCardsFromHand()
               └─ finalScore = chips × mult
          → blindRule.addScore(score)
          → handsRemaining--
-         → drawToHand(8) (if hands remain)
+         → drawToHand(8) → sortByRank() (if hands remain)
          → check blindRule.isBlindCleared()
 ```
 
@@ -142,7 +138,7 @@ indices → chooseHand.chooseFromHand() → removeCardsFromHand()
 
 ```
 indices → chooseHand.discardFromHand() → discardsRemaining--
-        → drawToHand(8)
+        → drawToHand(8) → sortByRank()
 ```
 
 ---
@@ -161,12 +157,12 @@ A simple value type. Each card contains:
 
 The deck is a `std::vector<Card>` managed directly by `GameManager`:
 
-| Function                | Purpose                                                                                         |
-| ----------------------- | ----------------------------------------------------------------------------------------------- |
-| `buildAndShuffleDeck()` | Creates 52 cards, shuffles with `std::mt19937`                                                  |
-| `drawToHand(n)`         | Pops cards from the back of `deck` into `currentHand` until hand has `n` cards or deck is empty |
+| Function                | Purpose                                                                                                                                 |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `buildAndShuffleDeck()` | Creates 52 cards, shuffles with `std::mt19937`. Called by `startBlind()` at every new blind.                                            |
+| `drawToHand(n)`         | Pops cards from the back of `deck` into `currentHand` until hand has `n` cards or deck is empty. Then calls `currentHand.sortByRank()`. |
 
-The deck uses `std::shuffle` with `std::random_device` for randomization.
+The deck is rebuilt and reshuffled fresh for every blind (not just once per session).
 
 ---
 
@@ -176,13 +172,14 @@ The deck uses `std::shuffle` with `std::random_device` for randomization.
 
 Stores the player's current cards as `std::vector<Card>`. Used for both the held hand and played hands.
 
-| Method              | Purpose                          |
-| ------------------- | -------------------------------- |
-| `addCard(Card)`     | Add a card                       |
-| `removeCard(index)` | Remove card at index             |
-| `getCards()`        | Returns const ref to card vector |
-| `getCardCount()`    | Number of cards                  |
-| `clear()`           | Remove all cards                 |
+| Method              | Purpose                               |
+| ------------------- | ------------------------------------- |
+| `addCard(Card)`     | Add a card                            |
+| `removeCard(index)` | Remove card at index                  |
+| `getCards()`        | Returns const ref to card vector      |
+| `getCardCount()`    | Number of cards                       |
+| `clear()`           | Remove all cards                      |
+| `sortByRank()`      | Sort cards descending by rank (Ace→2) |
 
 ### `ChooseHand` (`Hand/ChooseHand.h`)
 
@@ -206,7 +203,9 @@ Internal helpers:
 
 - `removeCardsFromHand()` — removes played cards by index (sorted descending)
 - `resolvePlayedHand()` — calls `ScoringRule::scoreHand()` then `JokerManager::notifyJokers()`
-- `drawToHand()` — draws from deck until hand reaches target count
+- `drawToHand()` — draws from deck until hand reaches target count, then calls `sortByRank()`
+
+Cards are always displayed in descending rank order (Ace-high → 2-low) thanks to automatic sorting after every draw.
 
 ---
 
