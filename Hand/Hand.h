@@ -47,6 +47,9 @@ public:
     size_t getCardCount() const;
     void clear();
 
+    /** Sort cards in descending order by rank (Ace-high → 2-low) */
+    void sortByRank();
+
 private:
     std::vector<Card> cards;
 };
