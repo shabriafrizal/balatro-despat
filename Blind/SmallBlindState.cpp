@@ -4,6 +4,7 @@
 
 #include "SkipReward/RewardCommandQueue.h"
 #include "SkipReward/BonusMoneyCommand.h"
+#include "SkipReward/BonusHandCommand.h"
 
 SmallBlindState::SmallBlindState(int anteLevel)
     : ante(anteLevel)

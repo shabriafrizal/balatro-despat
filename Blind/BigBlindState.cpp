@@ -4,6 +4,7 @@
 
 #include "SkipReward/RewardCommandQueue.h"
 #include "SkipReward/BonusMoneyCommand.h"
+#include "SkipReward/BonusHandCommand.h"
 
 BigBlindState::BigBlindState(int anteLevel)
     : ante(anteLevel)
@@ -41,7 +42,7 @@ void BigBlindState::transitionToNextState(BlindManager &manager, bool blindWon)
 
 void BigBlindState::queueSkipRewards(SkipReward::RewardCommandQueue &queue)
 {
-    // Big Blind skip: +$25
-    queue.enqueue(SkipReward::CommandTiming::Immediate,
-                  std::make_unique<SkipReward::BonusMoneyCommand>(25));
+    // Big Blind skip: +1 hand next blind
+    queue.enqueue(SkipReward::CommandTiming::NextBlind,
+                  std::make_unique<SkipReward::BonusHandCommand>());
 }

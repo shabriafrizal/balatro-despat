@@ -125,9 +125,6 @@ void GameManager::displayCurrentHand() const
 
 void GameManager::startBlind()
 {
-    // Execute any queued NextBlind rewards
-    executePendingCommands(SkipReward::CommandTiming::NextBlind);
-
     // Rebuild and shuffle a fresh deck for this blind
     currentHand.clear();
     buildAndShuffleDeck();
@@ -136,6 +133,10 @@ void GameManager::startBlind()
     blindRule.setRequiredScore(blindManager.getRequiredScore());
     handsRemaining = 4;
     discardsRemaining = 3;
+
+    // Execute any queued NextBlind rewards AFTER resetting defaults
+    // (so BonusHand / BonusDiscard commands add on top of base values)
+    executePendingCommands(SkipReward::CommandTiming::NextBlind);
 
     std::cout << "\n========== " << blindManager.getCurrentBlindName()
               << " (Ante " << blindManager.getAnteLevel() << ") ==========\n";
@@ -221,7 +222,7 @@ void GameManager::runSession()
 
                 // Show what was gained
                 std::cout << "\nSkipping " << blindManager.getCurrentBlindName()
-                          << " — gaining skip rewards!\n";
+                          << ", gaining skip rewards!\n";
                 {
                     const auto &pending = commandQueue.getPendingCommands();
                     for (const auto &cmd : pending)
@@ -232,9 +233,6 @@ void GameManager::runSession()
                 }
 
                 blindManager.skipBlind();
-
-                // Execute NextBlind commands at the start of the next blind
-                executePendingCommands(SkipReward::CommandTiming::NextBlind);
 
                 startBlind();
                 continue; // re-evaluate skip prompt for the next blind
